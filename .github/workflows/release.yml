@@ -1,0 +1,45 @@
+name: Release with Semantic Versioning
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Needed to create tags/releases
+      pull-requests: write # For changelog
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Important: full history for conventional commits
+
+      - name: Setup Git user
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Semantic Release
+        id: semantic
+        uses: cycjimmy/semantic-release-action@v4
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          branches: main
+          extra_plugins: |
+            @semantic-release/commit-analyzer
+            @semantic-release/release-notes-generator
+            @semantic-release/changelog
+            @semantic-release/git
+            @semantic-release/github
+
+      - name: Output new version
+        if: steps.semantic.outputs.new_release_published == 'true'
+        run: |
+          echo "New release published!"
+          echo "Version: ${{ steps.semantic.outputs.new_release_version }}"
+          echo "Tag: ${{ steps.semantic.outputs.new_release_git_tag }}"
