@@ -1,4 +1,4 @@
-name: Release with Semantic Versioning
+name: Semantic Release (GitHub Only)
 
 on:
   push:
@@ -9,37 +9,25 @@ jobs:
   release:
     runs-on: ubuntu-latest
     permissions:
-      contents: write # Needed to create tags/releases
-      pull-requests: write # For changelog
+      contents: write # For creating tags and releases
+      issues: write # For commenting on issues (optional)
+      pull-requests: write # For commenting on PRs (optional)
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Important: full history for conventional commits
+          fetch-depth: 0 # Full history needed for commit analysis
 
-      - name: Setup Git user
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20" # Latest LTS
 
-      - name: Semantic Release
-        id: semantic
-        uses: cycjimmy/semantic-release-action@v4
+      - name: Install semantic-release and GitHub-only plugins
+        run: npm install semantic-release @semantic-release/commit-analyzer @semantic-release/release-notes-generator @semantic-release/github
+
+      - name: Run semantic-release (GitHub releases only)
+        run: npx semantic-release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          branches: main
-          extra_plugins: |
-            @semantic-release/commit-analyzer
-            @semantic-release/release-notes-generator
-            @semantic-release/changelog
-            @semantic-release/git
-            @semantic-release/github
-
-      - name: Output new version
-        if: steps.semantic.outputs.new_release_published == 'true'
-        run: |
-          echo "New release published!"
-          echo "Version: ${{ steps.semantic.outputs.new_release_version }}"
-          echo "Tag: ${{ steps.semantic.outputs.new_release_git_tag }}"
