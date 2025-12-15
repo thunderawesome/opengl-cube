@@ -1,4 +1,4 @@
-name: Semantic Release (GitHub Only)
+name: Automatic Semantic Tag & Release
 
 on:
   push:
@@ -6,28 +6,29 @@ on:
       - main
 
 jobs:
-  release:
+  tag-and-release:
     runs-on: ubuntu-latest
     permissions:
-      contents: write # For creating tags and releases
-      issues: write # For commenting on issues (optional)
-      pull-requests: write # For commenting on PRs (optional)
+      contents: write # Needed for tagging and releases
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Full history needed for commit analysis
+          fetch-depth: 0 # Full history for commit analysis
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20" # Latest LTS
-
-      - name: Install semantic-release and GitHub-only plugins
-        run: npm install semantic-release @semantic-release/commit-analyzer @semantic-release/release-notes-generator @semantic-release/github
-
-      - name: Run semantic-release (GitHub releases only)
-        run: npx semantic-release
+      - name: Automatic tagging of releases
+        id: tag
+        uses: anothrNick/github-tag-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WITH_V: true # Tags like v1.0.0 (recommended)
+          DEFAULT_BUMP: minor # Default bump if no conventional commit type
+
+      - name: Create GitHub Release (if new tag created)
+        if: steps.tag.outputs.new_tag
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.new_tag }}
+          name: Release ${{ steps.tag.outputs.new_tag }}
+          generate_release_notes: true # Auto-generates changelog from commits
