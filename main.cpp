@@ -103,6 +103,85 @@ private:
 };
 
 // ------------------------------------------------------------
+// Camera state variables
+// ------------------------------------------------------------
+glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f, 3.0f);
+glm::vec3 cameraFront = glm::vec3(0.0f, 0.0f, -1.0f);
+glm::vec3 cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
+
+float yaw = -90.0f; // Default to looking down on -Z axis
+float pitch = 0.0f;
+float lastX = 400.0f; // Center of 800x600 window
+float lastY = 300.0f;
+bool firstMouse = true;
+
+float deltaTime = 0.0f;
+float lastFrame = 0.0f;
+
+float camSpeed = 5.0f;
+
+// ------------------------------------------------------------
+// Input processing
+// ------------------------------------------------------------
+void processInput(GLFWwindow *window)
+{
+    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
+        glfwSetWindowShouldClose(window, true);
+
+    float cameraSpeed = camSpeed * deltaTime; // Smooth speed regarldess of framerate
+
+    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+        cameraPos += cameraSpeed * cameraFront;
+    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+        cameraPos -= cameraSpeed * cameraFront;
+    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+        cameraPos -= glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed;
+    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+        cameraPos += glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed;
+}
+
+// ------------------------------------------------------------
+// Mouse callback for look-around
+// ------------------------------------------------------------
+void mouse_callback(GLFWwindow *window, double xposIn, double yPosIn)
+{
+    float xpos = static_cast<float>(xposIn);
+    float ypos = static_cast<float>(yPosIn);
+
+    if (firstMouse)
+    {
+        lastX = xpos;
+        lastY = ypos;
+        firstMouse = false;
+    }
+
+    float xoffset = xpos - lastX;
+    float yoffset = lastY - ypos;
+    lastX = xpos;
+    lastY = ypos;
+
+    float sensitivity = 0.1f;
+    xoffset *= sensitivity;
+    yoffset *= sensitivity;
+
+    yaw += xoffset;
+    pitch += yoffset;
+
+    // Clamp pitch to prevent flipping
+    if (pitch > 89.0f)
+        pitch = 89.0f;
+    if (pitch < -89.0f)
+        pitch = -89.0f;
+
+    // Clamp pitch to prevent flipping
+    glm::vec3 front;
+    front.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
+    front.y = sin(glm::radians(pitch));
+    front.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
+    cameraFront = glm::normalize(front);
+}
+
+// ------------------------------------------------------------
 // Vertex data: positions + colors for a cube
 // ------------------------------------------------------------
 float vertices[] = {
@@ -172,6 +251,10 @@ int main()
     glfwMakeContextCurrent(window);
     glfwSwapInterval(1); // VSync
 
+    // Capture mouse for look-around
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    glfwSetCursorPosCallback(window, mouse_callback);
+
     // Load OpenGL functions
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
     {
@@ -203,9 +286,13 @@ int main()
     // Render loop
     while (!glfwWindowShouldClose(window))
     {
-        // Input
-        if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
-            glfwSetWindowShouldClose(window, true);
+        // Timing for smooth movement
+        float currentFrame = static_cast<float>(glfwGetTime());
+        deltaTime = currentFrame - lastFrame;
+        lastFrame = currentFrame;
+
+        // Handle keyboard input
+        processInput(window);
 
         // Clear
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
@@ -218,11 +305,7 @@ int main()
         glm::mat4 model = glm::mat4(1.0f);
         model = glm::rotate(model, (float)glfwGetTime() * glm::radians(50.0f), glm::vec3(0.5f, 1.0f, 0.0f));
 
-        glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f, 3.0f);    // Set camera 3 units back on Z-axis
-        glm::vec3 cameraTarget = glm::vec3(0.0f, 0.0f, 0.0f); // Looking at origin (center of cube)
-        glm::vec3 cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);     // Up is +Y
-
-        glm::mat4 view = glm::lookAt(cameraPos, cameraTarget, cameraUp);
+        glm::mat4 view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
 
         glm::mat4 projection = glm::perspective(glm::radians(45.0f), 800.0f / 600.0f, 0.1f, 100.0f);
 
