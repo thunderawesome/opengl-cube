@@ -218,8 +218,11 @@ int main()
         glm::mat4 model = glm::mat4(1.0f);
         model = glm::rotate(model, (float)glfwGetTime() * glm::radians(50.0f), glm::vec3(0.5f, 1.0f, 0.0f));
 
-        glm::mat4 view = glm::mat4(1.0f);
-        view = glm::translate(view, glm::vec3(0.0f, 0.0f, -3.0f));
+        glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f, 3.0f);    // Set camera 3 units back on Z-axis
+        glm::vec3 cameraTarget = glm::vec3(0.0f, 0.0f, 0.0f); // Looking at origin (center of cube)
+        glm::vec3 cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);     // Up is +Y
+
+        glm::mat4 view = glm::lookAt(cameraPos, cameraTarget, cameraUp);
 
         glm::mat4 projection = glm::perspective(glm::radians(45.0f), 800.0f / 600.0f, 0.1f, 100.0f);
 
