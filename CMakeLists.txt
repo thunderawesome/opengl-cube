@@ -25,13 +25,10 @@ FetchContent_Declare(
     GIT_REPOSITORY https://github.com/glfw/glfw.git
     GIT_TAG 3.4
 )
-
-# Prevent GLFW from building docs, tests, and examples
 set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
 set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(GLFW_INSTALL OFF CACHE BOOL "" FORCE)
-
 FetchContent_MakeAvailable(glfw)
 
 # ------------------------------
@@ -52,22 +49,28 @@ target_link_libraries(cube PRIVATE
     OpenGL::GL
 )
 
-# ------------------------------
-# Find OpenGL (required)
-# ------------------------------
 find_package(OpenGL REQUIRED)
 
 # ------------------------------
-# Copy shaders to the executable's directory (handles multi-config like Debug/Release)
-# Uses generator expression to get the correct per-config output dir
+# Embed shaders as C++ strings
 # ------------------------------
+set(EMBEDDED_SHADERS_HEADER ${CMAKE_BINARY_DIR}/shaders_embedded.h)
+
 add_custom_command(
-    TARGET cube POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    OUTPUT ${EMBEDDED_SHADERS_HEADER}
+    COMMAND ${CMAKE_COMMAND}
+        -D INPUT_VERT=${CMAKE_CURRENT_SOURCE_DIR}/cube.vert
+        -D INPUT_FRAG=${CMAKE_CURRENT_SOURCE_DIR}/cube.frag
+        -D OUTPUT_HEADER=${EMBEDDED_SHADERS_HEADER}
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/embed_shaders.cmake
+    DEPENDS
         ${CMAKE_CURRENT_SOURCE_DIR}/cube.vert
-        $<TARGET_FILE_DIR:cube>/cube.vert
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
         ${CMAKE_CURRENT_SOURCE_DIR}/cube.frag
-        $<TARGET_FILE_DIR:cube>/cube.frag
-    COMMENT "Copying shader files to executable directory"
+        ${CMAKE_CURRENT_SOURCE_DIR}/embed_shaders.cmake
+    COMMENT "Embedding shaders into C++ header"
 )
+
+add_custom_target(embed_shaders DEPENDS ${EMBEDDED_SHADERS_HEADER})
+add_dependencies(cube embed_shaders)
+
+target_include_directories(cube PRIVATE ${CMAKE_BINARY_DIR})
