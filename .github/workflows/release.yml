@@ -20,9 +20,10 @@ jobs:
 
       - name: Install Linux dependencies (Ubuntu only)
         if: matrix.os == 'ubuntu-latest'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libxinerama-dev libxcursor-dev xorg-dev libglu1-mesa-dev pkg-config libwayland-dev wayland-protocols libx11-xcb-dev
+        uses: awalsh128/cache-apt-pkgs-action@v1
+        with:
+          packages: libxinerama-dev libxcursor-dev xorg-dev libglu1-mesa-dev pkg-config libwayland-dev wayland-protocols libx11-xcb-dev libxkbcommon-dev
+          version: 1.0
 
       - name: Cache dependencies (macOS only)
         if: matrix.os == 'macos-latest'
