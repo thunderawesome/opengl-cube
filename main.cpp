@@ -10,7 +10,43 @@
 #include <string>
 
 // ------------------------------------------------------------
-// Simple Shader class with file loading and error checking
+// Constants
+// ------------------------------------------------------------
+constexpr int WINDOW_WIDTH = 800;
+constexpr int WINDOW_HEIGHT = 600;
+constexpr float ASPECT_RATIO = static_cast<float>(WINDOW_WIDTH) / WINDOW_HEIGHT;
+
+constexpr float FOV_DEGREES = 45.0f;
+constexpr float NEAR_PLANE = 0.1f;
+constexpr float FAR_PLANE = 100.0f;
+
+constexpr float CUBE_ROTATION_SPEED = 50.0f; // degrees per second
+constexpr glm::vec3 CUBE_ROTATION_AXIS = glm::vec3(0.5f, 1.0f, 0.0f);
+
+constexpr float CAMERA_SPEED = 5.0f; // units per second
+constexpr float MOUSE_SENSITIVITY = 0.1f;
+constexpr float PITCH_CLAMP = 89.0f; // degrees
+
+constexpr glm::vec3 CLEAR_COLOR = glm::vec3(0.1f, 0.1f, 0.1f);
+
+// ------------------------------------------------------------
+// Camera state variables
+// ------------------------------------------------------------
+glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f, 3.0f);
+glm::vec3 cameraFront = glm::vec3(0.0f, 0.0f, -1.0f);
+glm::vec3 cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
+
+float yaw = -90.0f;
+float pitch = 0.0f;
+float lastX = WINDOW_WIDTH / 2.0f;
+float lastY = WINDOW_HEIGHT / 2.0f;
+bool firstMouse = true;
+
+float deltaTime = 0.0f;
+float lastFrame = 0.0f;
+
+// ------------------------------------------------------------
+// Simple Shader
 // ------------------------------------------------------------
 class Shader
 {
@@ -19,17 +55,14 @@ public:
 
     Shader(const char *vertexPath, const char *fragmentPath)
     {
-        // 1. Load shader source from files
         std::string vertexCode = loadFile(vertexPath);
         std::string fragmentCode = loadFile(fragmentPath);
         const char *vShaderCode = vertexCode.c_str();
         const char *fShaderCode = fragmentCode.c_str();
 
-        // 2. Compile shaders
         unsigned int vertex = compile(GL_VERTEX_SHADER, vShaderCode);
         unsigned int fragment = compile(GL_FRAGMENT_SHADER, fShaderCode);
 
-        // 3. Create and link program
         ID = glCreateProgram();
         glAttachShader(ID, vertex);
         glAttachShader(ID, fragment);
@@ -45,11 +78,6 @@ public:
     void setMat4(const std::string &name, const glm::mat4 &mat) const
     {
         glUniformMatrix4fv(glGetUniformLocation(ID, name.c_str()), 1, GL_FALSE, glm::value_ptr(mat));
-    }
-
-    void setVec3(const std::string &name, const glm::vec3 &value) const
-    {
-        glUniform3fv(glGetUniformLocation(ID, name.c_str()), 1, glm::value_ptr(value));
     }
 
 private:
@@ -101,6 +129,64 @@ private:
         }
     }
 };
+
+// ------------------------------------------------------------
+// Input processing
+// ------------------------------------------------------------
+void processInput(GLFWwindow *window)
+{
+    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
+        glfwSetWindowShouldClose(window, true);
+
+    float movementSpeed = CAMERA_SPEED * deltaTime;
+
+    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+        cameraPos += movementSpeed * cameraFront;
+    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+        cameraPos -= movementSpeed * cameraFront;
+    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+        cameraPos -= glm::normalize(glm::cross(cameraFront, cameraUp)) * movementSpeed;
+    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+        cameraPos += glm::normalize(glm::cross(cameraFront, cameraUp)) * movementSpeed;
+}
+
+// ------------------------------------------------------------
+// Mouse callback for look-around
+// ------------------------------------------------------------
+void mouse_callback(GLFWwindow *window, double xposIn, double yposIn)
+{
+    float xpos = static_cast<float>(xposIn);
+    float ypos = static_cast<float>(yposIn);
+
+    if (firstMouse)
+    {
+        lastX = xpos;
+        lastY = ypos;
+        firstMouse = false;
+    }
+
+    float xoffset = xpos - lastX;
+    float yoffset = lastY - ypos;
+    lastX = xpos;
+    lastY = ypos;
+
+    xoffset *= MOUSE_SENSITIVITY;
+    yoffset *= MOUSE_SENSITIVITY;
+
+    yaw += xoffset;
+    pitch += yoffset;
+
+    if (pitch > PITCH_CLAMP)
+        pitch = PITCH_CLAMP;
+    if (pitch < -PITCH_CLAMP)
+        pitch = -PITCH_CLAMP;
+
+    glm::vec3 front;
+    front.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
+    front.y = sin(glm::radians(pitch));
+    front.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
+    cameraFront = glm::normalize(front);
+}
 
 // ------------------------------------------------------------
 // Vertex data: positions + colors for a cube
@@ -162,15 +248,23 @@ int main()
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-    GLFWwindow *window = glfwCreateWindow(800, 600, "Rotating Color Cube", nullptr, nullptr);
+    GLFWwindow *window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Rotating Color Cube - Free Camera", nullptr, nullptr);
     if (!window)
     {
         std::cerr << "Failed to create GLFW window" << std::endl;
         glfwTerminate();
         return -1;
     }
+
     glfwMakeContextCurrent(window);
     glfwSwapInterval(1); // VSync
+
+    // Capture and center mouse
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    glfwSetCursorPosCallback(window, mouse_callback);
+
+    // Optional: Force cursor to center on startup
+    glfwSetCursorPos(window, WINDOW_WIDTH / 2.0, WINDOW_HEIGHT / 2.0);
 
     // Load OpenGL functions
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
@@ -184,7 +278,7 @@ int main()
     // Build and compile shader program
     Shader shader("cube.vert", "cube.frag");
 
-    // VAO, VBO
+    // VAO (vertex array), VBO (vertex buffers)
     unsigned int VAO, VBO;
     glGenVertexArrays(1, &VAO);
     glGenBuffers(1, &VBO);
@@ -200,28 +294,32 @@ int main()
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void *)(3 * sizeof(float)));
     glEnableVertexAttribArray(1);
 
-    // Render loop
+    // render loop
     while (!glfwWindowShouldClose(window))
     {
-        // Input
-        if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
-            glfwSetWindowShouldClose(window, true);
+        // Timing for smooth movement
+        float currentFrame = static_cast<float>(glfwGetTime());
+        deltaTime = currentFrame - lastFrame;
+        lastFrame = currentFrame;
 
-        // Clear
-        glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+        // Handle keyboard input
+        processInput(window);
+
+        glClearColor(CLEAR_COLOR.x, CLEAR_COLOR.y, CLEAR_COLOR.z, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         // Activate shader
         shader.use();
 
-        // Create transformations
+        // Model matrix - rotating cube
         glm::mat4 model = glm::mat4(1.0f);
-        model = glm::rotate(model, (float)glfwGetTime() * glm::radians(50.0f), glm::vec3(0.5f, 1.0f, 0.0f));
+        model = glm::rotate(model, currentFrame * glm::radians(CUBE_ROTATION_SPEED), CUBE_ROTATION_AXIS);
 
-        glm::mat4 view = glm::mat4(1.0f);
-        view = glm::translate(view, glm::vec3(0.0f, 0.0f, -3.0f));
+        // View matrix
+        glm::mat4 view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
 
-        glm::mat4 projection = glm::perspective(glm::radians(45.0f), 800.0f / 600.0f, 0.1f, 100.0f);
+        // Projection matrix
+        glm::mat4 projection = glm::perspective(glm::radians(FOV_DEGREES), ASPECT_RATIO, NEAR_PLANE, FAR_PLANE);
 
         shader.setMat4("model", model);
         shader.setMat4("view", view);
