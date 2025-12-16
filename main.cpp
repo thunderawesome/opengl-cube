@@ -27,6 +27,11 @@ constexpr float MOUSE_SENSITIVITY = 0.1f;
 constexpr float PITCH_CLAMP = 89.0f; // degrees
 constexpr glm::vec3 CLEAR_COLOR = glm::vec3(0.1f, 0.1f, 0.1f);
 
+// Lighting
+constexpr glm::vec3 LIGHT_POS = glm::vec3(1.2f, 1.0f, 2.0f);
+constexpr glm::vec3 LIGHT_COLOR = glm::vec3(1.0f, 1.0f, 1.0f);
+constexpr float LIGHT_SCALE = 0.2f;
+
 // ------------------------------------------------------------
 // Camera state variables
 // ------------------------------------------------------------
@@ -69,6 +74,11 @@ public:
     void setMat4(const std::string &name, const glm::mat4 &mat) const
     {
         glUniformMatrix4fv(glGetUniformLocation(ID, name.c_str()), 1, GL_FALSE, glm::value_ptr(mat));
+    }
+
+    void setVec3(const std::string &name, const glm::vec3 &value) const
+    {
+        glUniform3fv(glGetUniformLocation(ID, name.c_str()), 1, glm::value_ptr(value));
     }
 
 private:
@@ -167,51 +177,51 @@ void mouse_callback(GLFWwindow *window, double xposIn, double yposIn)
 }
 
 // ------------------------------------------------------------
-// Vertex data: positions + colors for a cube
+// Vertex data: positions + normals + colors for a cube
 // ------------------------------------------------------------
 float vertices[] = {
-    // positions          // colors
-    -0.5f, -0.5f, -0.5f, 1.0f, 0.0f, 0.0f,
-    0.5f, -0.5f, -0.5f, 0.0f, 1.0f, 0.0f,
-    0.5f, 0.5f, -0.5f, 0.0f, 0.0f, 1.0f,
-    0.5f, 0.5f, -0.5f, 0.0f, 0.0f, 1.0f,
-    -0.5f, 0.5f, -0.5f, 1.0f, 1.0f, 0.0f,
-    -0.5f, -0.5f, -0.5f, 1.0f, 0.0f, 0.0f,
+    // positions          // normals           // colors
+    -0.5f, -0.5f, -0.5f, 0.0f, 0.0f, -1.0f, 1.0f, 0.0f, 0.0f,
+    0.5f, -0.5f, -0.5f, 0.0f, 0.0f, -1.0f, 0.0f, 1.0f, 0.0f,
+    0.5f, 0.5f, -0.5f, 0.0f, 0.0f, -1.0f, 0.0f, 0.0f, 1.0f,
+    0.5f, 0.5f, -0.5f, 0.0f, 0.0f, -1.0f, 0.0f, 0.0f, 1.0f,
+    -0.5f, 0.5f, -0.5f, 0.0f, 0.0f, -1.0f, 1.0f, 1.0f, 0.0f,
+    -0.5f, -0.5f, -0.5f, 0.0f, 0.0f, -1.0f, 1.0f, 0.0f, 0.0f,
 
-    -0.5f, -0.5f, 0.5f, 1.0f, 0.0f, 1.0f,
-    0.5f, -0.5f, 0.5f, 0.0f, 1.0f, 1.0f,
-    0.5f, 0.5f, 0.5f, 1.0f, 1.0f, 1.0f,
-    0.5f, 0.5f, 0.5f, 1.0f, 1.0f, 1.0f,
-    -0.5f, 0.5f, 0.5f, 0.0f, 1.0f, 0.0f,
-    -0.5f, -0.5f, 0.5f, 1.0f, 0.0f, 1.0f,
+    -0.5f, -0.5f, 0.5f, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 1.0f,
+    0.5f, -0.5f, 0.5f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 1.0f,
+    0.5f, 0.5f, 0.5f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f,
+    0.5f, 0.5f, 0.5f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f,
+    -0.5f, 0.5f, 0.5f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f,
+    -0.5f, -0.5f, 0.5f, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 1.0f,
 
-    -0.5f, 0.5f, 0.5f, 0.0f, 1.0f, 0.0f,
-    -0.5f, 0.5f, -0.5f, 1.0f, 1.0f, 0.0f,
-    -0.5f, -0.5f, -0.5f, 1.0f, 0.0f, 0.0f,
-    -0.5f, -0.5f, -0.5f, 1.0f, 0.0f, 0.0f,
-    -0.5f, -0.5f, 0.5f, 1.0f, 0.0f, 1.0f,
-    -0.5f, 0.5f, 0.5f, 0.0f, 1.0f, 0.0f,
+    -0.5f, 0.5f, 0.5f, -1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f,
+    -0.5f, 0.5f, -0.5f, -1.0f, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f,
+    -0.5f, -0.5f, -0.5f, -1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
+    -0.5f, -0.5f, -0.5f, -1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
+    -0.5f, -0.5f, 0.5f, -1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f,
+    -0.5f, 0.5f, 0.5f, -1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f,
 
-    0.5f, 0.5f, 0.5f, 1.0f, 1.0f, 1.0f,
-    0.5f, 0.5f, -0.5f, 0.0f, 0.0f, 1.0f,
-    0.5f, -0.5f, -0.5f, 0.0f, 1.0f, 0.0f,
-    0.5f, -0.5f, -0.5f, 0.0f, 1.0f, 0.0f,
-    0.5f, -0.5f, 0.5f, 0.0f, 1.0f, 1.0f,
-    0.5f, 0.5f, 0.5f, 1.0f, 1.0f, 1.0f,
+    0.5f, 0.5f, 0.5f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f,
+    0.5f, 0.5f, -0.5f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f,
+    0.5f, -0.5f, -0.5f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f,
+    0.5f, -0.5f, -0.5f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f,
+    0.5f, -0.5f, 0.5f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f,
+    0.5f, 0.5f, 0.5f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f,
 
-    -0.5f, -0.5f, -0.5f, 1.0f, 0.0f, 0.0f,
-    0.5f, -0.5f, -0.5f, 0.0f, 1.0f, 0.0f,
-    0.5f, -0.5f, 0.5f, 0.0f, 1.0f, 1.0f,
-    0.5f, -0.5f, 0.5f, 0.0f, 1.0f, 1.0f,
-    -0.5f, -0.5f, 0.5f, 1.0f, 0.0f, 1.0f,
-    -0.5f, -0.5f, -0.5f, 1.0f, 0.0f, 0.0f,
+    -0.5f, -0.5f, -0.5f, 0.0f, -1.0f, 0.0f, 1.0f, 0.0f, 0.0f,
+    0.5f, -0.5f, -0.5f, 0.0f, -1.0f, 0.0f, 0.0f, 1.0f, 0.0f,
+    0.5f, -0.5f, 0.5f, 0.0f, -1.0f, 0.0f, 0.0f, 1.0f, 1.0f,
+    0.5f, -0.5f, 0.5f, 0.0f, -1.0f, 0.0f, 0.0f, 1.0f, 1.0f,
+    -0.5f, -0.5f, 0.5f, 0.0f, -1.0f, 0.0f, 1.0f, 0.0f, 1.0f,
+    -0.5f, -0.5f, -0.5f, 0.0f, -1.0f, 0.0f, 1.0f, 0.0f, 0.0f,
 
-    -0.5f, 0.5f, -0.5f, 1.0f, 1.0f, 0.0f,
-    0.5f, 0.5f, -0.5f, 0.0f, 0.0f, 1.0f,
-    0.5f, 0.5f, 0.5f, 1.0f, 1.0f, 1.0f,
-    0.5f, 0.5f, 0.5f, 1.0f, 1.0f, 1.0f,
-    -0.5f, 0.5f, 0.5f, 0.0f, 1.0f, 0.0f,
-    -0.5f, 0.5f, -0.5f, 1.0f, 1.0f, 0.0f};
+    -0.5f, 0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 1.0f, 1.0f, 0.0f,
+    0.5f, 0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f,
+    0.5f, 0.5f, 0.5f, 0.0f, 1.0f, 0.0f, 1.0f, 1.0f, 1.0f,
+    0.5f, 0.5f, 0.5f, 0.0f, 1.0f, 0.0f, 1.0f, 1.0f, 1.0f,
+    -0.5f, 0.5f, 0.5f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f,
+    -0.5f, 0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 1.0f, 1.0f, 0.0f};
 
 int main()
 {
@@ -226,7 +236,7 @@ int main()
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-    GLFWwindow *window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Rotating Color Cube - Free Camera", nullptr, nullptr);
+    GLFWwindow *window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "OpenGL Cube - Free Camera + Lighting", nullptr, nullptr);
     if (!window)
     {
         std::cerr << "Failed to create GLFW window" << std::endl;
@@ -264,11 +274,14 @@ int main()
     glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
     // position attribute
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void *)0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 9 * sizeof(float), (void *)0);
     glEnableVertexAttribArray(0);
-    // color attribute
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void *)(3 * sizeof(float)));
+    // normal attribute
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 9 * sizeof(float), (void *)(3 * sizeof(float)));
     glEnableVertexAttribArray(1);
+    // color attribute
+    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 9 * sizeof(float), (void *)(3 * sizeof(float)));
+    glEnableVertexAttribArray(2);
 
     // Render loop
     while (!glfwWindowShouldClose(window))
@@ -284,20 +297,29 @@ int main()
 
         shader.use();
 
-        glm::mat4 model = glm::mat4(1.0f);
-        model = glm::rotate(model, currentFrame * glm::radians(CUBE_ROTATION_SPEED), CUBE_ROTATION_AXIS);
-
         glm::mat4 view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
-
         glm::mat4 projection = glm::perspective(glm::radians(FOV_DEGREES), ASPECT_RATIO, NEAR_PLANE, FAR_PLANE);
 
-        shader.setMat4("model", model);
         shader.setMat4("view", view);
         shader.setMat4("projection", projection);
+        shader.setVec3("viewPos", cameraPos);
+        shader.setVec3("lightPos", LIGHT_POS);
+        shader.setVec3("lightColor", LIGHT_COLOR);
 
-        glBindVertexArray(VAO);
+        // --- Main rotating cube ---
+        glm::mat4 model = glm::mat4(1.0f);
+        model = glm::rotate(model, currentFrame * glm::radians(CUBE_ROTATION_SPEED), CUBE_ROTATION_AXIS);
+        shader.setMat4("model", model);
+
         glDrawArrays(GL_TRIANGLES, 0, 36);
 
+        // --- Light source cube ---
+        model = glm::mat4(1.0f);
+        model = glm::translate(model, LIGHT_POS);
+        model = glm::scale(model, glm::vec3(LIGHT_SCALE));
+        shader.setMat4("model", model);
+
+        glDrawArrays(GL_TRIANGLES, 0, 36);
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
