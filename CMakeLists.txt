@@ -38,6 +38,12 @@ add_library(glad STATIC src/glad.c)
 target_include_directories(glad PUBLIC include)
 
 # ------------------------------
+# STB Image (header-only for texture loading)
+# ------------------------------
+add_library(stb_image INTERFACE)
+target_include_directories(stb_image INTERFACE include)
+
+# ------------------------------
 # Executable
 # ------------------------------
 add_executable(cube main.cpp)
@@ -46,10 +52,14 @@ target_link_libraries(cube PRIVATE
     glad
     glfw
     glm::glm
+    stb_image
     OpenGL::GL
 )
 
 find_package(OpenGL REQUIRED)
+
+# Ensure include paths are set for stb_image.h and generated headers
+target_include_directories(cube PRIVATE include ${CMAKE_BINARY_DIR})
 
 # ------------------------------
 # Embed shaders as C++ strings
@@ -73,4 +83,13 @@ add_custom_command(
 add_custom_target(embed_shaders DEPENDS ${EMBEDDED_SHADERS_HEADER})
 add_dependencies(cube embed_shaders)
 
-target_include_directories(cube PRIVATE ${CMAKE_BINARY_DIR})
+# ------------------------------
+# Bundle container.jpg with the executable (for releases and local testing)
+# ------------------------------
+add_custom_command(
+    TARGET cube POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${CMAKE_CURRENT_SOURCE_DIR}/container.jpg
+        $<TARGET_FILE_DIR:cube>/container.jpg
+    COMMENT "Copying container.jpg to executable directory"
+)
