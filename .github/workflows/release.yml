@@ -62,7 +62,7 @@ jobs:
             echo "name=opengl-cube-macos" >> $GITHUB_OUTPUT
           fi
 
-      - name: Upload executable (shaders embedded, no external files needed)
+      - name: Upload executable (shaders embedded)
         uses: actions/upload-artifact@v4
         with:
           name: executable-${{ matrix.os }}
@@ -73,6 +73,9 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+
+    # Only run release job if a new tag will be created
+    if: success()
 
     steps:
       - name: Checkout code
@@ -90,41 +93,40 @@ jobs:
           mkdir -p release-zips
 
           # Windows
-          cp artifacts/executable-windows-latest/cube.exe release-zips/opengl-cube-windows.exe
+          cp artifacts/executable-windows-latest/cube.exe release-zips/opengl-cube-windows.exe || true
           cd release-zips
           zip opengl-cube-windows.zip opengl-cube-windows.exe
           cd -
 
           # Linux
-          cp artifacts/executable-ubuntu-latest/cube release-zips/opengl-cube-linux
+          cp artifacts/executable-ubuntu-latest/cube release-zips/opengl-cube-linux || true
           cd release-zips
           zip opengl-cube-linux.zip opengl-cube-linux
           cd -
 
           # macOS
-          cp artifacts/executable-macos-latest/cube release-zips/opengl-cube-macos
+          cp artifacts/executable-macos-latest/cube release-zips/opengl-cube-macos || true
           cd release-zips
           zip opengl-cube-macos.zip opengl-cube-macos
           cd -
 
-      - name: Automatic semantic tagging
+      - name: Semantic Version Tagging (only on qualifying commits)
         id: tag
         uses: mathieudutour/github-tag-action@v1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          # Disable automatic bumping for non-matching commits
-          default_bump: false
-          # Only these prefixes will trigger a version change
-          custom_release_rules: |
-            feat:minor,
-            fix:patch,
-            refactor:patch,
-            perf:patch,
-            breaking:major
+          default_bump: patch # Default if type not recognized
           release_branches: main
           create_annotated_tag: true
+          # Only these commit types trigger version bump
+          custom_release_rules: |
+            feat:minor
+            fix:patch
+            refactor:patch
+            perf:patch
+            breaking:major
 
-      - name: Create Release with platform ZIPs
+      - name: Create GitHub Release (only if new tag created)
         if: steps.tag.outputs.new_tag != ''
         uses: softprops/action-gh-release@v2
         with:
