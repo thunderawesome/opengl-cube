@@ -113,10 +113,12 @@ jobs:
         with:
           major_pattern: "(BREAKING CHANGE|breaking)"
           minor_pattern: "feat:"
-          patch_pattern: "(fix:|refactor:|perf:)"
+          # No patch_pattern — the action defaults to any non-major/minor commit as patch
           version_format: "v${major}.${minor}.${patch}"
-          enable_prereleases: false
           namespace: ""
+          # Optional: only bump on matching commits (prevents bump on chore/ci/style)
+          bump_each_commit: false
+          search_commit_body: true
 
       - name: Create Release with platform ZIPs (only if new version)
         if: steps.tag.outputs.version_tag != ''
