@@ -66,7 +66,7 @@ target_link_libraries(cube PRIVATE
 
 find_package(OpenGL REQUIRED)
 
-# Ensure include paths for custom headers, stb_image, and generated shaders
+# Ensure include paths for custom headers, stb_image, and generated files
 target_include_directories(cube PRIVATE include ${CMAKE_BINARY_DIR})
 
 # ------------------------------
@@ -92,12 +92,26 @@ add_custom_target(embed_shaders DEPENDS ${EMBEDDED_SHADERS_HEADER})
 add_dependencies(cube embed_shaders)
 
 # ------------------------------
-# Bundle container.jpg with the executable (for local testing and releases)
+# Embed default texture (container.jpg) as byte array
 # ------------------------------
+set(EMBEDDED_TEXTURE_HEADER ${CMAKE_BINARY_DIR}/embedded_texture.h)
+set(EMBEDDED_TEXTURE_CPP ${CMAKE_BINARY_DIR}/embedded_texture.cpp)
+
 add_custom_command(
-    TARGET cube POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    OUTPUT ${EMBEDDED_TEXTURE_HEADER} ${EMBEDDED_TEXTURE_CPP}
+    COMMAND ${CMAKE_COMMAND}
+        -D INPUT_TEXTURE=${CMAKE_CURRENT_SOURCE_DIR}/container.jpg
+        -D OUTPUT_HEADER=${EMBEDDED_TEXTURE_HEADER}
+        -D OUTPUT_CPP=${EMBEDDED_TEXTURE_CPP}
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/embed_texture.cmake
+    DEPENDS
         ${CMAKE_CURRENT_SOURCE_DIR}/container.jpg
-        $<TARGET_FILE_DIR:cube>/container.jpg
-    COMMENT "Copying container.jpg to executable directory"
+        ${CMAKE_CURRENT_SOURCE_DIR}/embed_texture.cmake
+    COMMENT "Embedding default texture (container.jpg)"
 )
+
+add_custom_target(embed_texture DEPENDS ${EMBEDDED_TEXTURE_HEADER} ${EMBEDDED_TEXTURE_CPP})
+add_dependencies(cube embed_texture)
+
+# Add the generated texture source file to the executable
+target_sources(cube PRIVATE ${EMBEDDED_TEXTURE_CPP})
