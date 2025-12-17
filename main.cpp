@@ -1,6 +1,6 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
-#include <glm/glm.hpp>
+
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
@@ -11,272 +11,19 @@
 // ------------------------------------------------------------
 #include "shaders_embedded.h"
 
-// ------------------------------------------------------------
-// STB Image for texture loading
-// ------------------------------------------------------------
-#define STB_IMAGE_IMPLEMENTATION
-#include "stb/stb_image.h"
-
-// ------------------------------------------------------------
-// Constants
-// ------------------------------------------------------------
-constexpr int WINDOW_WIDTH = 800;
-constexpr int WINDOW_HEIGHT = 600;
-constexpr float ASPECT_RATIO = static_cast<float>(WINDOW_WIDTH) / WINDOW_HEIGHT;
-constexpr float FOV_DEGREES = 45.0f;
-constexpr float NEAR_PLANE = 0.1f;
-constexpr float FAR_PLANE = 100.0f;
-constexpr float CUBE_ROTATION_SPEED = 50.0f;
-constexpr glm::vec3 CUBE_ROTATION_AXIS = glm::vec3(0.5f, 1.0f, 0.0f);
-constexpr float CAMERA_SPEED = 5.0f;
-constexpr float MOUSE_SENSITIVITY = 0.1f;
-constexpr float PITCH_CLAMP = 89.0f;
-constexpr glm::vec3 CLEAR_COLOR = glm::vec3(0.1f, 0.1f, 0.1f);
-
-// Lighting
-constexpr glm::vec3 LIGHT_POS = glm::vec3(1.2f, 1.0f, 2.0f);
-constexpr glm::vec3 LIGHT_COLOR = glm::vec3(1.0f, 1.0f, 1.0f);
-constexpr float LIGHT_SCALE = 0.2f;
-
-// ------------------------------------------------------------
-// Camera state
-// ------------------------------------------------------------
-glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f, 3.0f);
-glm::vec3 cameraFront = glm::vec3(0.0f, 0.0f, -1.0f);
-glm::vec3 cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
-float yaw = -90.0f;
-float pitch = 0.0f;
-float lastX = WINDOW_WIDTH / 2.0f;
-float lastY = WINDOW_HEIGHT / 2.0f;
-bool firstMouse = true;
-float deltaTime = 0.0f;
-float lastFrame = 0.0f;
-
-// ------------------------------------------------------------
-// Texture loading function
-// ------------------------------------------------------------
-unsigned int loadTexture(const char *path)
-{
-    unsigned int textureID;
-    glGenTextures(1, &textureID);
-
-    int width, height, nrComponents;
-    unsigned char *data = stbi_load(path, &width, &height, &nrComponents, 0);
-    if (data)
-    {
-        GLenum format = GL_RGB;
-        if (nrComponents == 1)
-            format = GL_RED;
-        else if (nrComponents == 3)
-            format = GL_RGB;
-        else if (nrComponents == 4)
-            format = GL_RGBA;
-
-        glBindTexture(GL_TEXTURE_2D, textureID);
-        glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
-        glGenerateMipmap(GL_TEXTURE_2D);
-
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-        stbi_image_free(data);
-        std::cout << "Loaded texture: " << path << std::endl;
-    }
-    else
-    {
-        std::cerr << "Failed to load texture: " << path << " - " << stbi_failure_reason() << std::endl;
-        stbi_image_free(data);
-    }
-
-    return textureID;
-}
-
-// ------------------------------------------------------------
-// Simple Shader class
-// ------------------------------------------------------------
-class Shader
-{
-public:
-    unsigned int ID;
-
-    Shader(const char *vertexSource, const char *fragmentSource)
-    {
-        unsigned int vertex = compile(GL_VERTEX_SHADER, vertexSource);
-        unsigned int fragment = compile(GL_FRAGMENT_SHADER, fragmentSource);
-
-        ID = glCreateProgram();
-        glAttachShader(ID, vertex);
-        glAttachShader(ID, fragment);
-        glLinkProgram(ID);
-        checkLinkErrors(ID);
-
-        glDeleteShader(vertex);
-        glDeleteShader(fragment);
-    }
-
-    void use() const { glUseProgram(ID); }
-
-    void setMat4(const std::string &name, const glm::mat4 &mat) const
-    {
-        glUniformMatrix4fv(glGetUniformLocation(ID, name.c_str()), 1, GL_FALSE, glm::value_ptr(mat));
-    }
-
-    void setVec3(const std::string &name, const glm::vec3 &value) const
-    {
-        glUniform3fv(glGetUniformLocation(ID, name.c_str()), 1, glm::value_ptr(value));
-    }
-
-    void setInt(const std::string &name, int value) const
-    {
-        glUniform1i(glGetUniformLocation(ID, name.c_str()), value);
-    }
-
-private:
-    unsigned int compile(unsigned int type, const char *source)
-    {
-        unsigned int shader = glCreateShader(type);
-        glShaderSource(shader, 1, &source, nullptr);
-        glCompileShader(shader);
-        checkCompileErrors(shader, type == GL_VERTEX_SHADER ? "VERTEX" : "FRAGMENT");
-        return shader;
-    }
-
-    void checkCompileErrors(unsigned int shader, const std::string &type)
-    {
-        int success;
-        char infoLog[1024];
-        glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
-        if (!success)
-        {
-            glGetShaderInfoLog(shader, 1024, nullptr, infoLog);
-            std::cerr << "ERROR::SHADER_COMPILATION_ERROR of type: " << type << "\n"
-                      << infoLog << std::endl;
-        }
-    }
-
-    void checkLinkErrors(unsigned int program)
-    {
-        int success;
-        char infoLog[1024];
-        glGetProgramiv(program, GL_LINK_STATUS, &success);
-        if (!success)
-        {
-            glGetProgramInfoLog(program, 1024, nullptr, infoLog);
-            std::cerr << "ERROR::PROGRAM_LINKING_ERROR\n"
-                      << infoLog << std::endl;
-        }
-    }
-};
-
-// ------------------------------------------------------------
-// Input processing
-// ------------------------------------------------------------
-void processInput(GLFWwindow *window)
-{
-    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
-        glfwSetWindowShouldClose(window, true);
-
-    float movementSpeed = CAMERA_SPEED * deltaTime;
-
-    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-        cameraPos += movementSpeed * cameraFront;
-    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-        cameraPos -= movementSpeed * cameraFront;
-    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-        cameraPos -= glm::normalize(glm::cross(cameraFront, cameraUp)) * movementSpeed;
-    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-        cameraPos += glm::normalize(glm::cross(cameraFront, cameraUp)) * movementSpeed;
-}
-
-// ------------------------------------------------------------
-// Mouse callback
-// ------------------------------------------------------------
-void mouse_callback(GLFWwindow *window, double xposIn, double yposIn)
-{
-    float xpos = static_cast<float>(xposIn);
-    float ypos = static_cast<float>(yposIn);
-
-    if (firstMouse)
-    {
-        lastX = xpos;
-        lastY = ypos;
-        firstMouse = false;
-    }
-
-    float xoffset = xpos - lastX;
-    float yoffset = lastY - ypos;
-    lastX = xpos;
-    lastY = ypos;
-
-    xoffset *= MOUSE_SENSITIVITY;
-    yoffset *= MOUSE_SENSITIVITY;
-
-    yaw += xoffset;
-    pitch += yoffset;
-
-    if (pitch > PITCH_CLAMP)
-        pitch = PITCH_CLAMP;
-    if (pitch < -PITCH_CLAMP)
-        pitch = -PITCH_CLAMP;
-
-    glm::vec3 front;
-    front.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
-    front.y = sin(glm::radians(pitch));
-    front.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
-    cameraFront = glm::normalize(front);
-}
-
-// ------------------------------------------------------------
-// Vertex data: positions + normals + texcoords + colors
-// ------------------------------------------------------------
-float vertices[] = {
-    // positions          // normals           // texcoords  // colors
-    -0.5f, -0.5f, -0.5f, 0.0f, 0.0f, -1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
-    0.5f, -0.5f, -0.5f, 0.0f, 0.0f, -1.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f,
-    0.5f, 0.5f, -0.5f, 0.0f, 0.0f, -1.0f, 1.0f, 1.0f, 0.0f, 0.0f, 1.0f,
-    0.5f, 0.5f, -0.5f, 0.0f, 0.0f, -1.0f, 1.0f, 1.0f, 0.0f, 0.0f, 1.0f,
-    -0.5f, 0.5f, -0.5f, 0.0f, 0.0f, -1.0f, 0.0f, 1.0f, 1.0f, 1.0f, 0.0f,
-    -0.5f, -0.5f, -0.5f, 0.0f, 0.0f, -1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
-
-    -0.5f, -0.5f, 0.5f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f,
-    0.5f, -0.5f, 0.5f, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f,
-    0.5f, 0.5f, 0.5f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
-    0.5f, 0.5f, 0.5f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
-    -0.5f, 0.5f, 0.5f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f,
-    -0.5f, -0.5f, 0.5f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f,
-
-    -0.5f, 0.5f, 0.5f, -1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f,
-    -0.5f, 0.5f, -0.5f, -1.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.0f,
-    -0.5f, -0.5f, -0.5f, -1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 0.0f,
-    -0.5f, -0.5f, -0.5f, -1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 0.0f,
-    -0.5f, -0.5f, 0.5f, -1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f,
-    -0.5f, 0.5f, 0.5f, -1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f,
-
-    0.5f, 0.5f, 0.5f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 1.0f, 1.0f,
-    0.5f, 0.5f, -0.5f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 0.0f, 1.0f,
-    0.5f, -0.5f, -0.5f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f,
-    0.5f, -0.5f, -0.5f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f,
-    0.5f, -0.5f, 0.5f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f,
-    0.5f, 0.5f, 0.5f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 1.0f, 1.0f,
-
-    -0.5f, -0.5f, -0.5f, 0.0f, -1.0f, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 0.0f,
-    0.5f, -0.5f, -0.5f, 0.0f, -1.0f, 0.0f, 1.0f, 1.0f, 0.0f, 1.0f, 0.0f,
-    0.5f, -0.5f, 0.5f, 0.0f, -1.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f,
-    0.5f, -0.5f, 0.5f, 0.0f, -1.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f,
-    -0.5f, -0.5f, 0.5f, 0.0f, -1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f,
-    -0.5f, -0.5f, -0.5f, 0.0f, -1.0f, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 0.0f,
-
-    -0.5f, 0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f, 0.0f,
-    0.5f, 0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 1.0f, 1.0f, 0.0f, 0.0f, 1.0f,
-    0.5f, 0.5f, 0.5f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f, 1.0f, 1.0f, 1.0f,
-    0.5f, 0.5f, 0.5f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f, 1.0f, 1.0f, 1.0f,
-    -0.5f, 0.5f, 0.5f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f,
-    -0.5f, 0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f, 0.0f};
+#include "Window.h"
+#include "Time.h"
+#include "Scene.h"
+#include "Light.h"
+#include "Camera.h"
+#include "Shader.h"
+#include "Texture.h"
+#include "Mesh.h"
+#include "InputSystem.h"
 
 int main()
 {
+    // Initialize GLFW
     if (!glfwInit())
     {
         std::cerr << "Failed to initialize GLFW" << std::endl;
@@ -296,11 +43,10 @@ int main()
     }
 
     glfwMakeContextCurrent(window);
-    glfwSwapInterval(1);
+    glfwSwapInterval(1); // VSync
 
+    // Input setup
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-    glfwSetCursorPosCallback(window, mouse_callback);
-    glfwSetCursorPos(window, WINDOW_WIDTH / 2.0, WINDOW_HEIGHT / 2.0);
 
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
     {
@@ -310,77 +56,63 @@ int main()
 
     glEnable(GL_DEPTH_TEST);
 
+    // Initialize core objects
     Shader shader(embedded_cube_vert, embedded_cube_frag);
+    Texture diffuseTexture("container.jpg");
+    Mesh cubeMesh;
+    InputSystem inputSystem;
 
-    // Load texture
-    unsigned int diffuseTexture = loadTexture("container.jpg");
+    // Register GLFW mouse callback using InputSystem's static wrapper
+    inputSystem.setupCallbacks(window);
 
-    unsigned int VAO, VBO;
-    glGenVertexArrays(1, &VAO);
-    glGenBuffers(1, &VBO);
+    // Center cursor initially
+    glfwSetCursorPos(window, WINDOW_WIDTH / 2.0, WINDOW_HEIGHT / 2.0);
 
-    glBindVertexArray(VAO);
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-
-    // position (location = 0)
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 11 * sizeof(float), (void *)0);
-    glEnableVertexAttribArray(0);
-    // normal (location = 1)
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 11 * sizeof(float), (void *)(3 * sizeof(float)));
-    glEnableVertexAttribArray(1);
-    // texcoord (location = 2)
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 11 * sizeof(float), (void *)(6 * sizeof(float)));
-    glEnableVertexAttribArray(2);
-    // color (location = 3)
-    glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, 11 * sizeof(float), (void *)(8 * sizeof(float)));
-    glEnableVertexAttribArray(3);
-
+    // Main render loop
     while (!glfwWindowShouldClose(window))
     {
         float currentFrame = static_cast<float>(glfwGetTime());
         deltaTime = currentFrame - lastFrame;
         lastFrame = currentFrame;
 
-        processInput(window);
+        // Process keyboard input
+        inputSystem.processKeyboard(window, deltaTime);
 
+        // Clear buffer
         glClearColor(CLEAR_COLOR.x, CLEAR_COLOR.y, CLEAR_COLOR.z, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+        // Activate shader and set uniforms
         shader.use();
 
-        glm::mat4 view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
-        glm::mat4 projection = glm::perspective(glm::radians(FOV_DEGREES), ASPECT_RATIO, NEAR_PLANE, FAR_PLANE);
+        // Camera matrices and view position
+        Camera camera;
+        camera.updateShaderUniforms(shader);
 
-        shader.setMat4("view", view);
-        shader.setMat4("projection", projection);
-        shader.setVec3("viewPos", cameraPos);
+        // Lighting
         shader.setVec3("lightPos", LIGHT_POS);
         shader.setVec3("lightColor", LIGHT_COLOR);
+
+        // Texture binding
         shader.setInt("diffuseTexture", 0);
+        diffuseTexture.bind(0);
 
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, diffuseTexture);
-
-        // Main rotating cube
+        // Draw main rotating cube
         glm::mat4 model = glm::mat4(1.0f);
         model = glm::rotate(model, currentFrame * glm::radians(CUBE_ROTATION_SPEED), CUBE_ROTATION_AXIS);
         shader.setMat4("model", model);
-        glDrawArrays(GL_TRIANGLES, 0, 36);
+        cubeMesh.draw();
 
-        // Light source cube
+        // Draw light source visualization cube
         model = glm::mat4(1.0f);
         model = glm::translate(model, LIGHT_POS);
         model = glm::scale(model, glm::vec3(LIGHT_SCALE));
         shader.setMat4("model", model);
-        glDrawArrays(GL_TRIANGLES, 0, 36);
+        cubeMesh.draw();
 
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
-
-    glDeleteVertexArrays(1, &VAO);
-    glDeleteBuffers(1, &VBO);
 
     glfwTerminate();
     return 0;

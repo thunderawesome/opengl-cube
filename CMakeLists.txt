@@ -44,9 +44,17 @@ add_library(stb_image INTERFACE)
 target_include_directories(stb_image INTERFACE include)
 
 # ------------------------------
-# Executable
+# Executable - with all refactored source files
 # ------------------------------
-add_executable(cube main.cpp)
+add_executable(cube
+    main.cpp
+    Camera.cpp
+    Shader.cpp
+    Texture.cpp
+    Mesh.cpp
+    InputSystem.cpp
+    Time.cpp
+)
 
 target_link_libraries(cube PRIVATE
     glad
@@ -58,7 +66,7 @@ target_link_libraries(cube PRIVATE
 
 find_package(OpenGL REQUIRED)
 
-# Ensure include paths are set for stb_image.h and generated headers
+# Ensure include paths for custom headers, stb_image, and generated shaders
 target_include_directories(cube PRIVATE include ${CMAKE_BINARY_DIR})
 
 # ------------------------------
@@ -84,7 +92,7 @@ add_custom_target(embed_shaders DEPENDS ${EMBEDDED_SHADERS_HEADER})
 add_dependencies(cube embed_shaders)
 
 # ------------------------------
-# Bundle container.jpg with the executable (for releases and local testing)
+# Bundle container.jpg with the executable (for local testing and releases)
 # ------------------------------
 add_custom_command(
     TARGET cube POST_BUILD
