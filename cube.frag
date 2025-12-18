@@ -13,21 +13,29 @@ uniform vec3 viewPos;
 
 void main()
 {
-    // ambient
+    // Ambient
     float ambientStrength = 0.1;
     vec3 ambient = ambientStrength * lightColor;
 
-    // diffuse
+    // Diffuse
     vec3 norm = normalize(Normal);
     vec3 lightDir = normalize(lightPos - FragPos);
     float diff = max(dot(norm, lightDir), 0.0);
     vec3 diffuse = diff * lightColor;
 
-    // texture
+    // Specular (Phong)
+    float specularStrength = 0.8;  // How shiny the material is
+    int shininess = 32;            // Higher = tighter highlight
+    vec3 viewDir = normalize(viewPos - FragPos);
+    vec3 reflectDir = reflect(-lightDir, norm);
+    float spec = pow(max(dot(viewDir, reflectDir), 0.0), shininess);
+    vec3 specular = specularStrength * spec * lightColor;
+
+    // Texture
     vec3 textureColor = texture(diffuseTexture, TexCoord).rgb;
 
-    // final color = lighting * texture * vertex color
-    vec3 result = (ambient + diffuse) * textureColor * VertexColor;
+    // Combine with vertex color tint
+    vec3 result = (ambient + diffuse + specular) * textureColor * VertexColor;
 
     FragColor = vec4(result, 1.0);
 }
