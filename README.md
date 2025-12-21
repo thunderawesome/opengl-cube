@@ -2,6 +2,9 @@
 
 This is a simple OpenGL project that renders a 3D cube with basic lighting and texture support. It features free-camera movement and mouse look controls, demonstrating core modern OpenGL concepts in C++.
 
+<img width="790" height="640" alt="image" src="https://github.com/user-attachments/assets/1d0d8ae6-31a8-4b54-acbf-bfda3042314c" />
+
+
 ## Features
 
 - **Diffuse and Specular Lighting** – Implements Phong lighting model with directional light.
